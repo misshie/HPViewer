@@ -8,21 +8,29 @@
 
 import sys,  getopt
 
+def print_version():
+    print("HPViewer version 1.10")
+
 def parameter_used():
     print("detail information is in the README.txt.")
     print("parameter_used: python %s -option <argument>" %sys.argv[0])
-    print("   -U     <STRING>    unpaired-fastq")
-    print("   -1     <STRING>    paired-fastq-R1")
-    print("   -2     <STRING>    paired-fastq-R2")
-    print("   -m     <STRING>    database mask type: hybrid-mask (default), repeat-mask, homology-mask")
-    print("   -o     <STRING>    prefix of output file")
-    print("   -p     <INT>       number of threaded, default is 1")
-    print("   -c    <INT>    minimal coverage threshold to determine HPV present, default is 150 bp.")
-
-    print("   -h/--help                     ")
-
+    print("   -U     <STRING>         unpaired-fastq")
+    print("   -1     <STRING>         paired-fastq-R1")
+    print("   -2     <STRING>         paired-fastq-R2")
+    print("   -m     <STRING>         database mask type: hybrid-mask (default), repeat-mask, homology-mask")
+    print("   -o     <STRING>         prefix of output file")
+    print("   -p     <INT>            number of threaded, default is 1")
+    print("   -c     <INT>            minimal coverage threshold to determine HPV present, default is 150 bp.")
+    print("   -d/--dedup              invoke 'samtools markdup' internally.")
+    print("   -s/--samtools=<STRING>  a path to the samtools executable (default: samtools)")
+    print("   -b/--bowtie2=<STRING>   a path to the bowtie2 executable  (default: bowtie2)")
+    print("   -e/--bedtools=<STRING>  a path to the bedtools executable (default: bedtools)")
+    print("   -V/--version")
+    print("   -h/--help")
+    print("")
+    
 try:
-    opts, args = getopt.getopt( sys.argv[1:], "U:1:2:m:o:p:c:h", ["help" ] )
+    opts, args = getopt.getopt( sys.argv[1:], "U:1:2:m:o:p:c:s:b:e:dhv", ["help", "version", "dedup", "samtools=", "bowtie2=", "bedtools="] )
 except getopt.GetoptError:
     print("miss parameters")
     parameter_used()
@@ -33,11 +41,18 @@ except getopt.GetoptError:
 nthreades="1"
 database_type="hybrid-mask"
 min_cov=str(150)
+stexe =  "samtools"
+btexe =  "bowtie2"
+bedexe = "bedtools"
+use_dedup = False
 
 ## retrieve settings
 for opt, val in opts:
     if opt in ( "-h", "--help" ):
         parameter_used()
+        sys.exit(1)
+    elif opt in ( "-V", "--version" ):
+        print_version()
         sys.exit(1)
     else:
         if opt in ( "-U", ):
@@ -54,7 +69,14 @@ for opt, val in opts:
             nthreades = str(val)
         if opt in ( "-c", ):
             min_cov = str(val)
-
+        if opt in ( "-s", "--samtools"):
+            stexe = str(val)
+        if opt in ( "-b", "--bowtie2"):
+            btexe = str(val)
+        if opt in ( "-e", "--bedtools"):
+            bedexe = str(val)
+        if opt in ( "-d", "--dedup"):
+            use_dedup = True
 
 try: 
     R1_pair, R2_pair, outprefix, database_type
@@ -66,8 +88,6 @@ except:
     except:
       print("\ninput fastq files error!")
       parameter_used()
-      
-      
       
 print (sequence_type)
 import os
@@ -88,6 +108,9 @@ else:
   print ("-m parameter has problems. -m repeat-mask or -m homology-mask")
 
 print ("HPView mode: "+database_type)
+print ("samtools path: "+stexe)
+print ("bowtie2 path: "+btexe)
+print ("bedtools path: "+bedexe)
 
 database_2=HPViewer_path+'database/homology-mask/HPV_homology_mask'
 import subprocess
@@ -106,12 +129,12 @@ outprefix=outprefix+'/temp/'+output_sample
 def align_unpaired( database, unpair, outprefix, nthreades):
 
     try:
-        subprocess.check_output(['bowtie2', '-h'])
+        subprocess.check_output([btexe, '-h'])
     except OSError:
         raise RuntimeError('bowtie2 not found; check if it is installed and in $PATH\n')
 
     # stream output from bowtie2
-    bowtie_args = ['bowtie2 -x '+ database+ ' -U '+ unpair +' -p '+nthreades+" --quiet --no-unal -S " +outprefix+".sam" ]
+    bowtie_args = [btexe+' -x '+ database+ ' -U '+ unpair +' -p '+nthreades+" --quiet --no-unal -S " +outprefix+".sam" ]
     for command in bowtie_args:
         call(command,shell=True)
 
@@ -121,12 +144,12 @@ def align_paired( database, R1_pair,R2_pair, outprefix, nthreades, flags=("--qui
 
     # check that we have access to bowtie2
     try:
-        subprocess.check_output(['bowtie2', '-h'])
+        subprocess.check_output([btexe, '-h'])
     except OSError:
         raise RuntimeError('bowtie2 not found; check if it is installed and in $PATH\n')
 
     # stream output from bowtie2
-    bowtie_args = ['bowtie2 -x '+ database+ ' -1 '+ R1_pair+' -2 '+R2_pair+' -p '+nthreades+" --quiet --no-unal -S " +outprefix+".sam" ]
+    bowtie_args = [btexe+' -x '+ database+ ' -1 '+R1_pair+' -2 '+R2_pair+' -p '+nthreades+" --quiet --no-unal -S " +outprefix+".sam" ]
     for command in bowtie_args:
         call(command,shell=True)
 
@@ -141,13 +164,26 @@ else:
 def run_samtools (outprefix,min_cov):
     
     try:
-        subprocess.check_output("samtools view -? ",shell=True)
+        subprocess.check_output(stexe+" view -? ",shell=True)
     except OSError:
         raise RuntimeError('samtools not found')
 
-    samtools_arg=['samtools view -bS '+outprefix+'.sam'+' | samtools sort  -o '+outprefix+'.bam',\
-    'samtools depth '+outprefix+'.bam'+ " | cut -f1 | uniq -c | rev| cut -d ' ' -f 1,2  | rev | awk '{if ($1 > "+min_cov+") {print $2}}'  > " + outprefix+'_L1_id.txt', \
-    'samtools view '+outprefix+'.bam'+" | cut -f3 |uniq -c | rev | cut -d ' ' -f 1,2   |  rev | grep   -Ff "+ outprefix+"_L1_id.txt  >" + outprefix+'_summary_L1.txt']
+    if 'use_dedup' in globals():
+        if sequence_type == 'paired':
+            samtools_arg=[stexe+' view -bS '+outprefix+'.sam | '+stexe+' collate -O - | '+stexe+' fixmate -m - - | '+stexe+' sort | '+stexe+' markdup -f '+outprefix+'.markdup.txt - '+outprefix+'.bam',\
+                          stexe+' index '+outprefix+'.bam', \
+                          stexe+' depth '+outprefix+'.bam'+ " | cut -f1 | uniq -c | rev| cut -d ' ' -f 1,2  | rev | awk '{if ($1 > "+min_cov+") {print $2}}'  > " +outprefix+'_L1_id.txt', \
+                          stexe+' view '+outprefix+'.bam'+" | cut -f3 |uniq -c | rev | cut -d ' ' -f 1,2   |  rev | grep   -Ff "+outprefix+"_L1_id.txt  >" +outprefix+'_summary_L1.txt']
+        else:
+            samtools_arg=[stexe+' view -bS '+outprefix+'.sam | '+stexe+' sort | '+stexe+' markdup -f '+outprefix+'.markdup.txt - '+outprefix+'.bam',\
+                          stexe+' index '+outprefix+'.bam', \
+                          stexe+' depth '+outprefix+'.bam'+ " | cut -f1 | uniq -c | rev| cut -d ' ' -f 1,2  | rev | awk '{if ($1 > "+min_cov+") {print $2}}'  > "+outprefix+'_L1_id.txt', \
+                          stexe+' view '+outprefix+'.bam'+" | cut -f3 |uniq -c | rev | cut -d ' ' -f 1,2   |  rev | grep   -Ff "+outprefix+"_L1_id.txt  >"+outprefix+'_summary_L1.txt']
+    else:
+        samtools_arg=[stexe+' view -bS '+outprefix+'.sam'+' | '+stexe+' sort  -o '+outprefix+'.bam',\
+                      stexe+' depth '+outprefix+'.bam'+ " | cut -f1 | uniq -c | rev| cut -d ' ' -f 1,2  | rev | awk '{if ($1 > "+min_cov+") {print $2}}'  > " +outprefix+'_L1_id.txt', \
+                      stexe+' view '+outprefix+'.bam'+" | cut -f3 |uniq -c | rev | cut -d ' ' -f 1,2   |  rev | grep   -Ff "+outprefix+"_L1_id.txt  >"+outprefix+'_summary_L1.txt']
+    
     for command in samtools_arg:
         call(command,shell=True)
 
@@ -258,25 +294,23 @@ def hybrid_database (outprefix,min_cov):
       for command in hybrid_arg0:
          call(command,shell=True)
     else:
-        hybrid_arg1=["bedtools bamtofastq -i "+outprefix+".bam -fq "+outprefix+"_HPV.fastq"]
+        hybrid_arg1=[bedexe+" bamtofastq -i "+outprefix+".bam -fq "+outprefix+"_HPV.fastq"]
         for command in hybrid_arg1:
           call(command,shell=True)
-        hybrid_bowtie=["bowtie2 -x "+database_2+ " --no-unal --quiet -U "+outprefix+"_HPV.fastq -S "+outprefix+"_hybrid.sam -p "+nthreades]
+        hybrid_bowtie=[btexe+" -x "+database_2+" --no-unal --quiet -U "+outprefix+"_HPV.fastq -S "+outprefix+"_hybrid.sam -p "+nthreades]
         for command in hybrid_bowtie:
           call(command,shell=True)
      
-        hybrid_samtools=['samtools view -bS '+outprefix+'_hybrid.sam'+' | samtools sort  -o '+outprefix+'_hybrid.bam ',\
-        "samtools depth "+outprefix+"_hybrid.bam | cut -f1 | uniq -c | rev| cut -d ' ' -f 1,2  | rev | awk -F ' '  '{if ($1 > "+min_cov+") {print $2}}' > "  + outprefix+"_hybrid_summary_L3.txt"]
+        hybrid_samtools=[stexe+' view -bS '+outprefix+'_hybrid.sam | '+stexe+' sort  -o '+outprefix+'_hybrid.bam ',\
+        stexe+" depth "+outprefix+"_hybrid.bam | cut -f1 | uniq -c | rev| cut -d ' ' -f 1,2  | rev | awk -F ' '  '{if ($1 > "+min_cov+") {print $2}}' > "  + outprefix+"_hybrid_summary_L3.txt"]
         for command in hybrid_samtools:
           call(command,shell=True)
 
         summary_2_input=outprefix+'_hybrid_summary_L3.txt'
         summary_2(summary_2_input)
-    
 
 
-    
-    
+                          
 def quant_HPV(outprefix,min_cov):
     if database_type=="hybrid-mask":
       hybrid_database (outprefix,min_cov)
