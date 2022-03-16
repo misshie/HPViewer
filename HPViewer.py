@@ -21,7 +21,7 @@ def parameter_used():
     print("   -o     <STRING>         prefix of output file")
     print("   -p     <INT>            number of threaded, default is 1")
     print("   -c     <INT>            minimal coverage threshold to determine HPV present, default is 150 bp.")
-    print("   -d/--dedup              invoke 'samtools markdup' internally.")
+    print("   -d/--dedup              invoke 'samtools markdup internally.")
     print("   -s/--samtools=<STRING>  a path to the samtools executable (default: samtools)")
     print("   -b/--bowtie2=<STRING>   a path to the bowtie2 executable  (default: bowtie2)")
     print("   -e/--bedtools=<STRING>  a path to the bedtools executable (default: bedtools)")
@@ -168,7 +168,7 @@ def run_samtools (outprefix,min_cov):
     except OSError:
         raise RuntimeError('samtools not found')
 
-    if 'use_dedup' in globals():
+    if use_dedup == True:
         if sequence_type == 'paired':
             samtools_arg=[stexe+' view -bS '+outprefix+'.sam | '+stexe+' collate -O - | '+stexe+' fixmate -m - - | '+stexe+' sort | '+stexe+' markdup -f '+outprefix+'.markdup.txt - '+outprefix+'.bam',\
                           stexe+' index '+outprefix+'.bam', \
@@ -301,14 +301,22 @@ def hybrid_database (outprefix,min_cov):
         for command in hybrid_bowtie:
           call(command,shell=True)
      
-        hybrid_samtools=[stexe+' view -bS '+outprefix+'_hybrid.sam | '+stexe+' sort  -o '+outprefix+'_hybrid.bam ',\
-        stexe+" depth "+outprefix+"_hybrid.bam | cut -f1 | uniq -c | rev| cut -d ' ' -f 1,2  | rev | awk -F ' '  '{if ($1 > "+min_cov+") {print $2}}' > "  + outprefix+"_hybrid_summary_L3.txt"]
+        if use_dedup == True:
+            if sequence_type == 'paired':
+                hybrid_samtools=[stexe+' view -bS '+outprefix+'_hybrid.sam | '+stexe+' collate -O - | '+stexe+' fixmate -m - - | '+stexe+' sort | '+stexe+' markdup -f '+outprefix+'.markdup_hyrid.txt - '+outprefix+'_hybrid.bam', \
+                                 stexe+" depth "+outprefix+"_hybrid.bam | cut -f1 | uniq -c | rev| cut -d ' ' -f 1,2  | rev | awk -F ' '  '{if ($1 > "+min_cov+") {print $2}}' > "  + outprefix+"_hybrid_summary_L3.txt"]
+            else:
+                hybrid_samtools=[stexe+' view -bS '+outprefix+'_hybrid.sam | '+stexe+' sort | '+stexe+' markdup -f '+outprefix+'.markdup_hyrid.txt - '+outprefix+'_hybrid.bam', \
+                                 stexe+" depth "+outprefix+"_hybrid.bam | cut -f1 | uniq -c | rev| cut -d ' ' -f 1,2  | rev | awk -F ' '  '{if ($1 > "+min_cov+") {print $2}}' > "  + outprefix+"_hybrid_summary_L3.txt"]
+        else:
+            hybrid_samtools=[stexe+' view -bS '+outprefix+'_hybrid.sam | '+stexe+' sort  -o '+outprefix+'_hybrid.bam ',\
+                             stexe+" depth "+outprefix+"_hybrid.bam | cut -f1 | uniq -c | rev| cut -d ' ' -f 1,2  | rev | awk -F ' '  '{if ($1 > "+min_cov+") {print $2}}' > "  + outprefix+"_hybrid_summary_L3.txt"]
+
         for command in hybrid_samtools:
           call(command,shell=True)
 
         summary_2_input=outprefix+'_hybrid_summary_L3.txt'
         summary_2(summary_2_input)
-
 
                           
 def quant_HPV(outprefix,min_cov):
