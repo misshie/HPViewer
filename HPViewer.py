@@ -89,7 +89,8 @@ except:
       print("\ninput fastq files error!")
       parameter_used()
       
-print (sequence_type)
+print ("sequece type: "+sequence_type)
+
 import os
 
 HPViewer_path = os.path.dirname(os.path.realpath(__file__))
@@ -111,6 +112,10 @@ print ("HPView mode: "+database_type)
 print ("samtools path: "+stexe)
 print ("bowtie2 path: "+btexe)
 print ("bedtools path: "+bedexe)
+print ("nthreades: "+nthreades)
+print ("min_cov: "+min_cov)
+print ("use_dedup: "+str(use_dedup))
+
 
 database_2=HPViewer_path+'database/homology-mask/HPV_homology_mask'
 import subprocess
@@ -134,7 +139,7 @@ def align_unpaired( database, unpair, outprefix, nthreades):
         raise RuntimeError('bowtie2 not found; check if it is installed and in $PATH\n')
 
     # stream output from bowtie2
-    bowtie_args = [btexe+' -x '+ database+ ' -U '+ unpair +' -p '+nthreades+" --quiet --no-unal -S " +outprefix+".sam" ]
+    bowtie_args = [btexe+' -x '+database+' -U '+unpair+' -p '+nthreades+" --quiet --no-unal -S " +outprefix+".sam" ]
     for command in bowtie_args:
         call(command,shell=True)
 
@@ -149,7 +154,7 @@ def align_paired( database, R1_pair,R2_pair, outprefix, nthreades, flags=("--qui
         raise RuntimeError('bowtie2 not found; check if it is installed and in $PATH\n')
 
     # stream output from bowtie2
-    bowtie_args = [btexe+' -x '+ database+ ' -1 '+R1_pair+' -2 '+R2_pair+' -p '+nthreades+" --quiet --no-unal -S " +outprefix+".sam" ]
+    bowtie_args = [btexe+' -x '+database+' -1 '+R1_pair+' -2 '+R2_pair+' -p '+nthreades+" --quiet --no-unal -S "+outprefix+".sam" ]
     for command in bowtie_args:
         call(command,shell=True)
 
