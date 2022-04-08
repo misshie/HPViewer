@@ -230,7 +230,11 @@ def summary_1(FILE):
     for line in f2:
         line=line.rstrip()
         hpv_count=int(line.split(' ')[0])
-        hpv_id=line.split('|')[-2].replace("REF.1","").replace("REF.2","")
+        if len(line.split('|')) == 1:
+            hpv_id = line
+        else:
+            hpv_id=line.split('|')[-2].replace("REF.1","").replace("REF.2","")
+
         if hpv_count > 99:
           high_hpv.append(hpv_id)
 
@@ -267,7 +271,11 @@ def summary_2(F3):
         line2=line2.rstrip().split(' ')
         HPV_f2[line2[1]]=line2[0]
     for line3 in f3:
-        h3=line3.rstrip().split('|')[-2].replace("REF.1","").replace("REF.2","")
+        if len(line3.rstrip().split('|')) == 1:
+            h3 = line3
+        else:
+            h3=line3.rstrip().split('|')[-2].replace("REF.1","").replace("REF.2","")
+            
         HPV_f2[h3]='confirm'
     for h in HPV_f2:
         if HPV_f2[h] == 'confirm':
@@ -277,7 +285,11 @@ def summary_2(F3):
 
 def HPVname(old):
     if 'REF' in old:
-      new=old.split('|')[-2].replace("REF.1","").replace("REF.2","")
+        if len(old.split('|')) == 1:
+            new = old
+        else:
+            new=old.split('|')[-2].replace("REF.1","").replace("REF.2","")
+            
     else:
       new=old
     return new
