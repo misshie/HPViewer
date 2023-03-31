@@ -231,7 +231,7 @@ def summary_1(FILE):
         line=line.rstrip()
         hpv_count=int(line.split(' ')[0])
         if len(line.split('|')) == 1:
-            hpv_id = line
+            hpv_id = line.replace("REF.1","").replace("REF.2","")
         else:
             hpv_id=line.split('|')[-2].replace("REF.1","").replace("REF.2","")
 
@@ -272,7 +272,7 @@ def summary_2(F3):
         HPV_f2[line2[1]]=line2[0]
     for line3 in f3:
         if len(line3.rstrip().split('|')) == 1:
-            h3 = line3
+            h3 = line3.rstrip().replace("REF.1","").replace("REF.2","")
         else:
             h3=line3.rstrip().split('|')[-2].replace("REF.1","").replace("REF.2","")
             
@@ -286,12 +286,12 @@ def summary_2(F3):
 def HPVname(old):
     if 'REF' in old:
         if len(old.split('|')) == 1:
-            new = old
+            new = old.replace("REF.1","").replace("REF.2","")
         else:
             new=old.split('|')[-2].replace("REF.1","").replace("REF.2","")
-            
     else:
-      new=old
+        new=old
+
     return new
 
 summary_1_input=outprefix+'_summary_L1.txt'
@@ -307,7 +307,7 @@ def hybrid_database (outprefix,min_cov):
             if 'suspected' in line_hf:
                 suspect=suspect+1
     if suspect == 0:
-      hybrid_arg0=["cut -d ' ' -f2 " +outprefix+"_summary_L2.txt > "+outprefix+"_final_summary_L4.txt"]
+      hybrid_arg0=["cut -d ' ' -f3 " +outprefix+"_summary_L2.txt > "+outprefix+"_final_summary_L4.txt"] ## <<<<< -f2
       for command in hybrid_arg0:
          call(command,shell=True)
     else:
